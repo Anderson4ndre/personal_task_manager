@@ -5,22 +5,24 @@
 
 void formatFile(FILE*);
 void clearScreen(void);
+int linesNum(FILE*);
 void menu(void);
-void tasks(FILE *, FILE *);
+void tasks(FILE *, FILE *, int);
 void addTask(FILE *, char *);
 void deleteTask(FILE *, int);
 long int fileSize(FILE *);
-void my_fileReader(FILE *);
 
 int main(void){
     int choice = -1;
+    int page = 1;
     char s[STRING_SIZE];
-    FILE* categoriesNames;
+    FILE* categoriesNames = fopen("./categorias/index.txt","r+");
     FILE* taskFile;
+    int pageLines = linesNum(categoriesNames);
     do{
         clearScreen();
         printf("\n");
-        tasks(taskFile, categoriesNames);
+        tasks(taskFile, categoriesNames, page);
         menu();
         scanf("%d", &choice);
         switch(choice){ //Inserir na posição X
@@ -37,6 +39,11 @@ int main(void){
                 scanf("%d", &choice);
                 deleteTask(taskFile, choice);
                 break;
+            case 3:
+                fprintf(stdout, "Digite a página: ");
+                scanf("%d", &page);
+                //fclose(taskFile);
+                break;
             default:
                 printf("Comando não reconhecido\n");
         }
@@ -48,24 +55,50 @@ void clearScreen(void){
     printf("\e[1;1H\e[2J");
 }
 
-void tasks(FILE *taskFile, FILE *categories){
+int linesNum(FILE *file){
+    int lines = 0;
     char s[STRING_SIZE];
-    int i = 0;
-    char c;
-    categories = fopen("./categorias/index.txt", "r");
-    taskFile = fopen("./categorias/cat1.txt", "r");
+    while(fgets(s, sizeof(s), file) != NULL){
+        lines++;
+    };
+    rewind(file);
+    return lines;
+}
+
+//Under maintanace
+void tasks(FILE *taskFile, FILE *categories, int page){
+    char s[STRING_SIZE];
+    int c;
+    for(int i = 1; i < page; i++){
+        fgets(s, sizeof(s), categories);
+    }
+    s[0] = '\0'; //Limpa s[0] para entra no próximo for 
+
     while((c = fgetc(categories)) != ' '){
         fputc(c, stdout);
     }
-    fputs("\n\n", stdout);
-    while(fgets(s, sizeof(s), taskFile)){
-        printf("%d-%s", ++i, s);
+    for(int i = 0; s[i] != '\n'; i++ )
+    {
+        c = fgetc(categories);
+        s[i] = c;
+        if(c == '|'){
+            s[i] = '\0';
+        }
     }
+    taskFile = fopen(s, "r+");
+    printf("\n%s", s); //DEBUG
+    fputs("\n\n", stdout);
+    for(int i = 1; fgets(s, sizeof(s), taskFile); i++){
+        printf("%d-%s", i, s);
+    }
+    
     printf("\n\n");
+    rewind(taskFile);
+    rewind(categories);
 }
 
 void menu(void){
-    printf("ADD(1) COMPLETAR(2) SAIR(0)\n");
+    printf("ADD(1) COMPLETAR(2) CATEGORIA(3) SAIR(0)\n");
     printf("O que deseja fazer? ");
 }
 

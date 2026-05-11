@@ -1,1 +1,2 @@
-Default cat1.txt
+Default categorias/cat1.txt|
+Pomni categorias/cat2.txt|
