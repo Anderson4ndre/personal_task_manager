@@ -12,7 +12,7 @@ struct taskFilePage{
 };
 
 
-void printPage(FILE*, char*, char*); //OK
+void printPage(struct taskFilePage *, char*); //OK
 void clearScreen(void); //OK
 //int linesNum(FILE*);
 void startPage(FILE *, char *); //OK
@@ -21,7 +21,7 @@ void taskFileMgr(struct taskFilePage *, FILE *, char *);
 void addTask(FILE *, char *); //OK
 void deleteTask(struct taskFilePage *, FILE *, int, char *); //OK
 void addCategorie(FILE *, char *, char *);
-void deleteCategorie(FILE **, int);
+void deleteCategorie(FILE **, int, char *);
 void renameCategorie(FILE **, int, char *);
 int my_strcpy(char *, char *); //OK
 int totalLines(FILE *, char *); //OK
@@ -62,7 +62,7 @@ int main(void){
                 scanf("%d", &page);
                 fgetc(stdin);
                 if(!page) break;
-                deleteCategorie(&index, page);
+                deleteCategorie(&index, page, buffer);
                 break;
             case 4:
                 printf("Número: ");
@@ -85,21 +85,21 @@ void clearScreen(void){
     printf("\e[1;1H\e[2J");
 }
 
-void printPage(FILE *page, char *buffer, char *pageName){
+void printPage(struct taskFilePage *currentTaskPage, char *buffer){
     clearScreen();
     int i = 0;
-    printf("\n\n%s\n", pageName);
-    while(fgets(buffer, STRING_SIZE, page)){
+    printf("\n\n%s\n\n", currentTaskPage->pageName);
+    while(fgets(buffer, STRING_SIZE, currentTaskPage->taskFile)){
         fprintf(stdout, "%d - %s", ++i, buffer);
     }
-    rewind(page);
+    rewind(currentTaskPage->taskFile);
 }
 
 void taskFileMgr(struct taskFilePage *currentPage, FILE *index, char *buffer){
     int selector;
     int option;
     do{
-        printPage(currentPage->taskFile, buffer,currentPage->pageName);
+        printPage(currentPage, buffer);
         printf("\nADD(1) COMPLETAR (2) VOLTAR(0)\n");
         printf("Opção: ");
         scanf("%d", &selector);
@@ -130,24 +130,27 @@ void taskFileMgr(struct taskFilePage *currentPage, FILE *index, char *buffer){
 }
 
 void accessPage(struct taskFilePage *currentPage, FILE *index, char *buffer){ //Abre o arquivo desejado
-    int c;
+    int c = 0;
     char name[50];
-    for(int i = 0; i < (2 * (*currentPage).page - 1); i++){ //2 * page - 1 mapeia index names
-        fgets(name, sizeof(name), index); 
+
+    rewind(index);
+    //Vai até uma linha antes do nome da página desejada
+    for(int i = 0; i < (2 * (*currentPage).page - 2); i++){ //2 * page - 1 mapeia index names
+        fgets(buffer, STRING_SIZE, index); 
     }
 
-    for(int i = 0; c != '|'; i++)
-    {
-        c = fgetc(index);
-        buffer[i] = c;
-        if(c == '|'){
-            buffer[i] = '\0';
-        }
+    //Lê o nome da página
+    if(fgets(name, sizeof(name), index)) {
+        name[strcspn(name, "\n")] = '\0'; // Remove o \n
+        my_strcpy(name, currentPage->pageName);
+    }
+
+    if(fgets(buffer, STRING_SIZE, index)) {
+        buffer[strcspn(buffer, "\n\r")] = '\0';
     }
 
     (*currentPage).taskFile = fopen(buffer, "r+");
     rewind(index);
-    my_strcpy(name, (*currentPage).pageName);
 }
 
 void startPage(FILE *index, char *buffer){
@@ -185,11 +188,11 @@ void deleteTask(struct taskFilePage *currentPage, FILE *index, int value, char *
         fgets(buffer, STRING_SIZE, index); 
     }
 
-    for(int i = 0; c != '|'; i++)
+    for(int i = 0; c != '\n'; i++)
     {
         c = fgetc(index);
         buffer[i] = c;
-        if(c == '|'){
+        if(c == '\n'){
             buffer[i] = '\0';
         }
     }
@@ -202,21 +205,22 @@ void deleteTask(struct taskFilePage *currentPage, FILE *index, int value, char *
 void addCategorie(FILE *index, char *pageName, char *buffer){
     FILE *newCat;
     int lines;
-    while(fgets(buffer, STRING_SIZE, index));
-    fputc('\n', index);
+    int tailCheck;
+    fseek(index, 0, SEEK_END);
     fputs(pageName, index);
-    fprintf(index ,"\ncategorias/%s.txt|", pageName);
+    fprintf(index ,"\n./categorias/%s.txt", pageName);
+    fputc('\n', index);
     rewind(index);//OK
     lines = totalLines(index, buffer);
     printf("%d", lines);//DEBUG
     
-    for(int i = 0; i < 9;){
+    for(int i = 0; i < lines - 1;){
         if(fgetc(index) == '\n') i++;
     }
 
     for(int i = 0;buffer[i] != '\0';i++){
         buffer[i] = fgetc(index);
-        if(buffer[i] == '|'){
+        if(buffer[i] == '\n'){
             buffer[i] = '\0';
         }
     }
@@ -227,19 +231,44 @@ void addCategorie(FILE *index, char *pageName, char *buffer){
     rewind(index);
 }
 
-void deleteCategorie(FILE **index, int page){
-    int currentLine = 0;
+void deleteCategorie(FILE **index, int page, char *buffer){
+    int currentLine = 1;
+    int c;
     FILE *tempFile = fopen("./categorias/tempFile.txt", "w");
-    char secondBuffer[STRING_SIZE];
-    while(fgets(secondBuffer, STRING_SIZE, *index)){
-        currentLine++;
-        if(currentLine == page * 2 - 1 || currentLine == page * 2) continue;
-        else fputs(secondBuffer, tempFile);
-    };
+
+    //Faz a cópia de index.txt sem as informações da categoria a ser removida
+    while ((c = fgetc(*index)) != EOF) {
+        if (currentLine == (page * 2 - 1)) {
+            if (c == '\n') currentLine++;
+            continue; 
+        }
+        if (currentLine == (page * 2)){
+            int i = 0;
+            buffer[i] = c; //Cópia o '.'
+            i++;
+            while ((c = fgetc(*index)) != '\n' && c != EOF) //Copia o endereço do arquivo a ser removido para buffer
+            {
+                buffer[i] = c;
+                i++;
+            }
+            buffer[i] = '\0';
+            currentLine++;
+            continue;
+        }
+
+        fputc(c, tempFile);
+
+        if (c == '\n') {
+            currentLine++;
+        }
+    }
+    fprintf(stdout, "\n%s\n", buffer); //DEBUG
+    remove(buffer);
     fclose(tempFile);
     fclose(*index);
     remove("./categorias/index.txt");
     rename("./categorias/tempFile.txt", "./categorias/index.txt");
+    
     *index = fopen("./categorias/index.txt", "r+");
 
 }
