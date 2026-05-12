@@ -22,8 +22,9 @@ void addTask(FILE *, char *); //OK
 void deleteTask(struct taskFilePage *, FILE *, int, char *); //OK
 void addCategorie(FILE *, char *, char *);
 void deleteCategorie(FILE *);
+void renameCategorie(FILE **, int, char *);
 int my_strcpy(char *, char *); //OK
-int totalLines(FILE *, char *); //Pode virar quantidade de linhas
+int totalLines(FILE *, char *); //OK
 
 int main(void){
     int choice = -1;
@@ -55,10 +56,15 @@ int main(void){
                 addCategorie(index, pageName, buffer);
                 break;
             case 3:
-                fprintf(stdout, "Digite a página: ");
-                scanf("%d", &page);
-                //fclose(taskFile);
-                //accessPage(&taskFile, index, page);
+
+                break;
+            case 4:
+                printf("Número: ");
+                scanf("%d", &choice);
+                fgetc(stdin);
+                printf("Novo nome: ");
+                fgets(buffer, STRING_SIZE, stdin);
+                renameCategorie(&index, choice, buffer);
                 break;
             default:
                 printf("Comando não reconhecido\n");
@@ -109,18 +115,8 @@ void taskFileMgr(struct taskFilePage *currentPage, FILE *index, char *buffer){
                 fgetc(stdin);
                 deleteTask(currentPage, index, option, buffer);
                 break;
-            case 3:
-
-                break;
-            case 4:
-                printf("Número: ");
-                scanf("%d", &option);
-                fgetc(stdin);
-                printf("Novo nome: ");
-                fgets(buffer, STRING_SIZE, stdin);
-                break;
             default:
-            printf("Comando inválido");
+                printf("Comando inválido");
         }
     }while(selector);
 }
@@ -157,7 +153,7 @@ void startPage(FILE *index, char *buffer){
     rewind(index);
 }
 
-void addTask(FILE *taskfile, char *buffer){
+void addTask(FILE *taskfile, char *buffer){ //Dá para usar o taskfile no modo +a ao invés de se mover com fgets
     char temp[STRING_SIZE];
     while((fgets(temp, STRING_SIZE, taskfile)));
     fputs(buffer, taskfile);
@@ -165,6 +161,7 @@ void addTask(FILE *taskfile, char *buffer){
     rewind(taskfile);
 }
 
+//Dá para reestruturar apenas jogando o que está em TempFile de volta para taskFile no modo w
 void deleteTask(struct taskFilePage *currentPage, FILE *index, int value, char *buffer){
     int i = 1;
     int c = '\0';
@@ -176,7 +173,7 @@ void deleteTask(struct taskFilePage *currentPage, FILE *index, int value, char *
     }
     fclose(tempFile);
     fclose(currentPage->taskFile);
-    for(int i = 0; i < (2 * currentPage->page - 1); i++){ //2page - 1 mapeia index names
+    for(int i = 0; i < (2 * currentPage->page - 1); i++){ //2 * page - 1 mapeia index names
         fgets(buffer, STRING_SIZE, index); 
     }
 
@@ -224,6 +221,22 @@ void addCategorie(FILE *index, char *pageName, char *buffer){
 
 void deleteCategorie(FILE *index){
 
+}
+
+void renameCategorie(FILE **index, int page, char *buffer){
+    int currentLine = 0;
+    FILE *tempFile = fopen("./categorias/tempFile.txt", "w");
+    char secondBuffer[STRING_SIZE];
+    while(fgets(secondBuffer, STRING_SIZE, *index)){
+        currentLine++;
+        if(currentLine == page * 2 - 1) fputs(buffer, tempFile);
+        else fputs(secondBuffer, tempFile);
+    };
+    fclose(tempFile);
+    fclose(*index);
+    remove("./categorias/index.txt");
+    rename("./categorias/tempFile.txt", "./categorias/index.txt");
+    *index = fopen("./categorias/index.txt", "r+");
 }
 
 int my_strcpy(char *origin, char *destiny){
