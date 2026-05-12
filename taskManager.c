@@ -21,7 +21,7 @@ void taskFileMgr(struct taskFilePage *, FILE *, char *);
 void addTask(FILE *, char *); //OK
 void deleteTask(struct taskFilePage *, FILE *, int, char *); //OK
 void addCategorie(FILE *, char *, char *);
-void deleteCategorie(FILE *);
+void deleteCategorie(FILE **, int);
 void renameCategorie(FILE **, int, char *);
 int my_strcpy(char *, char *); //OK
 int totalLines(FILE *, char *); //OK
@@ -47,23 +47,31 @@ int main(void){
                 fprintf(stdout, "Digite a página: ");
                 scanf("%d", &currentPage.page);
                 fgetc(stdin);
+                if(!(currentPage.page)) break;
                 accessPage(&currentPage, index, buffer);
                 taskFileMgr(&currentPage, index, buffer);
                 break;
             case 2:
                 fprintf(stdout, "Digite um nome: ");
                 scanf("%s", pageName);
+                if(pageName == "0\n") break;
                 addCategorie(index, pageName, buffer);
                 break;
             case 3:
-
+                printf("Número: ");
+                scanf("%d", &page);
+                fgetc(stdin);
+                if(!page) break;
+                deleteCategorie(&index, page);
                 break;
             case 4:
                 printf("Número: ");
                 scanf("%d", &choice);
                 fgetc(stdin);
+                if(choice == 0) break;
                 printf("Novo nome: ");
                 fgets(buffer, STRING_SIZE, stdin);
+                // if 0 break
                 renameCategorie(&index, choice, buffer);
                 break;
             default:
@@ -219,7 +227,20 @@ void addCategorie(FILE *index, char *pageName, char *buffer){
     rewind(index);
 }
 
-void deleteCategorie(FILE *index){
+void deleteCategorie(FILE **index, int page){
+    int currentLine = 0;
+    FILE *tempFile = fopen("./categorias/tempFile.txt", "w");
+    char secondBuffer[STRING_SIZE];
+    while(fgets(secondBuffer, STRING_SIZE, *index)){
+        currentLine++;
+        if(currentLine == page * 2 - 1 || currentLine == page * 2) continue;
+        else fputs(secondBuffer, tempFile);
+    };
+    fclose(tempFile);
+    fclose(*index);
+    remove("./categorias/index.txt");
+    rename("./categorias/tempFile.txt", "./categorias/index.txt");
+    *index = fopen("./categorias/index.txt", "r+");
 
 }
 
