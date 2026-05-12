@@ -1,48 +1,64 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define STRING_SIZE 128
 #define CATEGORY_LIMIT 5
 
-void formatFile(FILE*);
-void clearScreen(void);
-int linesNum(FILE*);
-void menu(void);
-void tasks(FILE *, FILE *, int);
-void addTask(FILE *, char *);
-void deleteTask(FILE *, int);
-long int fileSize(FILE *);
+struct taskFilePage{
+    FILE *taskFile;
+    int page;
+    char pageName[25];
+    //Maybe a page path?
+};
+
+
+void printPage(FILE*, char*, char*); //OK
+void clearScreen(void); //OK
+//int linesNum(FILE*);
+void startPage(FILE *, char *); //OK
+void accessPage(struct taskFilePage *, FILE *, char *); //OK
+void taskFileMgr(struct taskFilePage *, FILE *, char *);
+void addTask(FILE *, char *); //OK
+void deleteTask(struct taskFilePage *, FILE *, int, char *); //OK
+void addCategorie(FILE *, char *, char *);
+void deleteCategorie(FILE *);
+int my_strcpy(char *, char *); //OK
+int totalLines(FILE *, char *); //Pode virar quantidade de linhas
 
 int main(void){
     int choice = -1;
-    int page = 1;
-    char s[STRING_SIZE];
-    FILE* categoriesNames = fopen("./categorias/index.txt","r+");
-    FILE* taskFile;
-    int pageLines = linesNum(categoriesNames);
+    int page;
+    char pageName[25]; //Para não guardar no buffer e perder
+    struct taskFilePage currentPage;
+    FILE *index = fopen("./categorias/index.txt","r+");
+    char buffer[STRING_SIZE];
     do{
         clearScreen();
         printf("\n");
-        tasks(taskFile, categoriesNames, page);
-        menu();
-        scanf("%d", &choice);
-        switch(choice){ //Inserir na posição X
-            case 0:
+        startPage(index, buffer); 
+        scanf("%d", &choice); 
+        fgetc(stdin); //Retira o \n 
+        switch(choice){ 
+            case 0: //OK
                 clearScreen();
                 exit(0);
-            case 1:
-                fprintf(stdout, "Digite a tarefa: ");
-                fgets(s, sizeof(STRING_SIZE), stdin);
-                addTask(taskFile, s);
+            case 1: //OK
+                fprintf(stdout, "Digite a página: ");
+                scanf("%d", &currentPage.page);
+                fgetc(stdin);
+                accessPage(&currentPage, index, buffer);
+                taskFileMgr(&currentPage, index, buffer);
                 break;
             case 2:
-                fprintf(stdout, "Digite o valor: ");
-                scanf("%d", &choice);
-                deleteTask(taskFile, choice);
+                fprintf(stdout, "Digite um nome: ");
+                scanf("%s", pageName);
+                addCategorie(index, pageName, buffer);
                 break;
             case 3:
                 fprintf(stdout, "Digite a página: ");
                 scanf("%d", &page);
                 //fclose(taskFile);
+                //accessPage(&taskFile, index, page);
                 break;
             default:
                 printf("Comando não reconhecido\n");
@@ -55,80 +71,181 @@ void clearScreen(void){
     printf("\e[1;1H\e[2J");
 }
 
-int linesNum(FILE *file){
-    int lines = 0;
-    char s[STRING_SIZE];
-    while(fgets(s, sizeof(s), file) != NULL){
-        lines++;
-    };
-    rewind(file);
-    return lines;
+void printPage(FILE *page, char *buffer, char *pageName){
+    clearScreen();
+    int i = 0;
+    printf("\n\n%s\n", pageName);
+    while(fgets(buffer, STRING_SIZE, page)){
+        fprintf(stdout, "%d - %s", ++i, buffer);
+    }
+    rewind(page);
 }
 
-//Under maintanace
-void tasks(FILE *taskFile, FILE *categories, int page){
-    char s[STRING_SIZE];
-    int c;
-    for(int i = 1; i < page; i++){
-        fgets(s, sizeof(s), categories);
-    }
-    s[0] = '\0'; //Limpa s[0] para entra no próximo for 
+void taskFileMgr(struct taskFilePage *currentPage, FILE *index, char *buffer){
+    int selector;
+    int option;
+    do{
+        printPage(currentPage->taskFile, buffer,currentPage->pageName);
+        printf("\nADD(1) COMPLETAR (2) VOLTAR(0)\n");
+        printf("Opção: ");
+        scanf("%d", &selector);
+        fgetc(stdin);
+        
+        switch(selector){
+            case 0:
+                fclose((*currentPage).taskFile);
+                currentPage->page = 0;
+                *currentPage->pageName = '\0';
+                break;
+            case 1:
+                printf("Tarefa: ");
+                fgets(buffer, STRING_SIZE, stdin); //PODE DAR BUFFER OVERFLOW
+                printf("%s", buffer);
+                addTask((*currentPage).taskFile, buffer);
+                break;
+            case 2:
+                printf("Número: ");
+                scanf("%d", &option);
+                fgetc(stdin);
+                deleteTask(currentPage, index, option, buffer);
+                break;
+            case 3:
 
-    while((c = fgetc(categories)) != ' '){
-        fputc(c, stdout);
+                break;
+            case 4:
+                printf("Número: ");
+                scanf("%d", &option);
+                fgetc(stdin);
+                printf("Novo nome: ");
+                fgets(buffer, STRING_SIZE, stdin);
+                break;
+            default:
+            printf("Comando inválido");
+        }
+    }while(selector);
+}
+
+void accessPage(struct taskFilePage *currentPage, FILE *index, char *buffer){ //Abre o arquivo desejado
+    int c;
+    char name[50];
+    for(int i = 0; i < (2 * (*currentPage).page - 1); i++){ //2 * page - 1 mapeia index names
+        fgets(name, sizeof(name), index); 
     }
-    for(int i = 0; s[i] != '\n'; i++ )
+
+    for(int i = 0; c != '|'; i++)
     {
-        c = fgetc(categories);
-        s[i] = c;
+        c = fgetc(index);
+        buffer[i] = c;
         if(c == '|'){
-            s[i] = '\0';
+            buffer[i] = '\0';
         }
     }
-    taskFile = fopen(s, "r+");
-    printf("\n%s", s); //DEBUG
-    fputs("\n\n", stdout);
-    for(int i = 1; fgets(s, sizeof(s), taskFile); i++){
-        printf("%d-%s", i, s);
+
+    (*currentPage).taskFile = fopen(buffer, "r+");
+    rewind(index);
+    my_strcpy(name, (*currentPage).pageName);
+}
+
+void startPage(FILE *index, char *buffer){
+    int i = 0;
+    while(fgets(buffer, STRING_SIZE, index)){
+        fprintf(stdout, "%d - %s", ++i, buffer);
+        fgets(buffer, STRING_SIZE, index);
     }
-    
-    printf("\n\n");
-    rewind(taskFile);
-    rewind(categories);
-}
-
-void menu(void){
-    printf("ADD(1) COMPLETAR(2) CATEGORIA(3) SAIR(0)\n");
+    printf("ACESSAR(1) ADICIONAR(2) REMOVER(3) RENOMEAR(4) SAIR(0)\n");
     printf("O que deseja fazer? ");
+    rewind(index);
 }
 
-void addTask(FILE *taskfile, char *s){
-    char checkHead;
-    char checkTail;
-    taskfile = fopen("./categorias/cat1.txt", "a+");
-     //PAIA
-    fgets(s, STRING_SIZE, stdin);
-    fputs(s, taskfile);
-    fclose(taskfile);
+void addTask(FILE *taskfile, char *buffer){
+    char temp[STRING_SIZE];
+    while((fgets(temp, STRING_SIZE, taskfile)));
+    fputs(buffer, taskfile);
+    fflush(taskfile); //Pesquisar mais sobre fflush
+    rewind(taskfile);
 }
 
-void deleteTask(FILE* taskFile, int value){
-    char s[STRING_SIZE];
+void deleteTask(struct taskFilePage *currentPage, FILE *index, int value, char *buffer){
     int i = 1;
+    int c = '\0';
     FILE *tempFile = fopen("./tempFile.txt", "w");
-    taskFile = fopen("./categorias/cat1.txt", "r");
-    while(fgets(s, sizeof(s), taskFile)){
+    while(fgets(buffer, STRING_SIZE, (*currentPage).taskFile)){
         if(i++ != value){
-            fputs(s, tempFile);
+            fputs(buffer, tempFile);
         }
     }
     fclose(tempFile);
-    fclose(taskFile);
-    remove("./categorias/cat1.txt");
-    rename("tempFile.txt", "./categorias/cat1.txt");
+    fclose(currentPage->taskFile);
+    for(int i = 0; i < (2 * currentPage->page - 1); i++){ //2page - 1 mapeia index names
+        fgets(buffer, STRING_SIZE, index); 
+    }
+
+    for(int i = 0; c != '|'; i++)
+    {
+        c = fgetc(index);
+        buffer[i] = c;
+        if(c == '|'){
+            buffer[i] = '\0';
+        }
+    }
+    remove(buffer);
+    rename("tempFile.txt", buffer);
+    rewind(index);
+    currentPage->taskFile = fopen(buffer, "r+");
 }
 
-long int fileSize(FILE* file){
-    fseek(file, 0, SEEK_END);
-    return ftell(file);
+void addCategorie(FILE *index, char *pageName, char *buffer){
+    FILE *newCat;
+    int lines;
+    while(fgets(buffer, STRING_SIZE, index));
+    fputc('\n', index);
+    fputs(pageName, index);
+    fprintf(index ,"\ncategorias/%s.txt|", pageName);
+    rewind(index);//OK
+    lines = totalLines(index, buffer);
+    printf("%d", lines);//DEBUG
+    
+    for(int i = 0; i < 9;){
+        if(fgetc(index) == '\n') i++;
+    }
+
+    for(int i = 0;buffer[i] != '\0';i++){
+        buffer[i] = fgetc(index);
+        if(buffer[i] == '|'){
+            buffer[i] = '\0';
+        }
+    }
+
+    printf("%s", buffer);//DEBUG
+    newCat = fopen(buffer, "w");
+    fclose(newCat);
+    rewind(index);
+}
+
+void deleteCategorie(FILE *index){
+
+}
+
+int my_strcpy(char *origin, char *destiny){
+    int size = strlen(origin);
+    for(int i  = 0; i <= size; i++){
+        *(destiny + i) = *(origin + i);
+    }
+    return 1;
+}
+
+
+int totalLines(FILE *index, char *buffer) {
+    int lines = 0;
+
+    if (index == NULL) return 0;
+
+    while (fgets(buffer, STRING_SIZE, index)) {
+        if (buffer[0] != '\n' && buffer[0] != '\0') {
+            lines++;
+        }
+    }
+
+    rewind(index);
+    return lines;
 }
