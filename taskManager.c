@@ -54,7 +54,7 @@ int main(void){
             case 2:
                 fprintf(stdout, "Digite um nome: ");
                 scanf("%s", pageName);
-                if(pageName == "0\n") break;
+                if(!strcmp(pageName, "0")) break;
                 addCategorie(index, pageName, buffer);
                 break;
             case 3:
@@ -62,7 +62,8 @@ int main(void){
                 scanf("%d", &page);
                 fgetc(stdin);
                 if(!page) break;
-                deleteCategorie(&index, page, buffer);
+                printf("\033[1;31mTEM CERTEZA QUE DESEJA APAGAR O ITEM %d?(s ou n) \033[0m", page);
+                if(fgetc(stdin) == 's') deleteCategorie(&index, page, buffer);
                 break;
             case 4:
                 printf("Número: ");
@@ -97,7 +98,7 @@ void printPage(struct taskFilePage *currentTaskPage, char *buffer){
 
 void taskFileMgr(struct taskFilePage *currentPage, FILE *index, char *buffer){
     int selector;
-    int option;
+    int i;
     do{
         printPage(currentPage, buffer);
         printf("\nADD(1) COMPLETAR (2) VOLTAR(0)\n");
@@ -113,15 +114,17 @@ void taskFileMgr(struct taskFilePage *currentPage, FILE *index, char *buffer){
                 break;
             case 1:
                 printf("Tarefa: ");
-                fgets(buffer, STRING_SIZE, stdin); //PODE DAR BUFFER OVERFLOW
+                fgets(buffer, STRING_SIZE, stdin);
+                if(!strcmp(buffer, "0\n")) break;
                 printf("%s", buffer);
                 addTask((*currentPage).taskFile, buffer);
                 break;
             case 2:
                 printf("Número: ");
-                scanf("%d", &option);
+                scanf("%d", &i);
                 fgetc(stdin);
-                deleteTask(currentPage, index, option, buffer);
+                if(i == 0) break;
+                deleteTask(currentPage, index, i, buffer);
                 break;
             default:
                 printf("Comando inválido");
@@ -205,12 +208,15 @@ void deleteTask(struct taskFilePage *currentPage, FILE *index, int value, char *
 void addCategorie(FILE *index, char *pageName, char *buffer){
     FILE *newCat;
     int lines;
-    int tailCheck;
+
+    //Adiciona o nome e o caminho no index.txt
     fseek(index, 0, SEEK_END);
     fputs(pageName, index);
     fprintf(index ,"\n./categorias/%s.txt", pageName);
     fputc('\n', index);
+
     rewind(index);//OK
+    
     lines = totalLines(index, buffer);
     printf("%d", lines);//DEBUG
     
